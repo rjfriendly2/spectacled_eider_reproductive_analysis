@@ -414,13 +414,22 @@ se <- c(s1994,s1995,s1996,s1997,s1998,s1999,s2000,s2001,
         s2012u,s2013u,s2014u,s2015u,s2016u,s2017u,s2018u,s2019u)
 se <- as.data.frame(se)
 
-# Combine 'probsuccess' and 'se' to get a dataframe where you can work with to get lower and upper CI.
-data <- cbind(probsuccess,se)
-data$lci <- data$probsuccess - 1.96*(se)
-data$uci <- data$probsuccess + 1.96*(se)
+# Create dataframe for the 95% confidence intervals
+lci <- probsuccess - 1.96*(se)
+lci <- as.data.frame(lci)
+colnames(lci)[colnames(lci) == "probsuccess"] <- "lci"
+
+uci <- probsuccess + 1.96*(se)
+uci <- as.data.frame(uci)
+colnames(uci)[colnames(uci) == "probsuccess"] <- "uci"
+
+# Combine 'probsuccess' and 'lci' and 'uci'.
+data <- cbind(probsuccess,lci,uci)
+#data$lci <- data$probsuccess - 1.96*(se)
+#data$uci <- data$probsuccess + 1.96*(se)
 
 
-# Create a figure of the annual nest survival estimats for both sites.
+# Create a figure of the annual nest survival estimates for both sites.
 
 # Add site and year to dataframe we just created.
 data$Site <- c("Kigigak Island","Kigigak Island","Kigigak Island","Kigigak Island","Kigigak Island","Kigigak Island",
@@ -439,11 +448,18 @@ data$year <- c("1994","1995","1996","1997","1998","1999",
 
 data$probsuccess<-as.numeric(data$probsuccess) #in case it is not recognized as numerical values
 
+# save new data frame as csv to not need to run model set 1 again
+write.csv(data, "nest_survival/output/annual_ns_estimates.csv")
+annual_ns_estimates <- read.csv("nest_survival/output/annual_ns_estimates.csv", header = TRUE)
+summary(annual_ns_estimates)
+annual_ns_estimates$Site <- as.factor(annual_ns_estimates$Site)
+annual_ns_estimates$year <- as.factor(annual_ns_estimates$year)
+
 
 # Plot
 ggplot(data, aes(x = year, y = probsuccess, color = Site)) +
   #geom_ribbon(aes(ymin = lcl, ymax = ucl), alpha = 0.13) +
-  geom_errorbar(aes(ymin = lci$se, ymax = uci$se, width = 0.4)) +
+  geom_errorbar(aes(ymin = lci, ymax = uci, width = 0.4)) +
   geom_point() +
   geom_hline(yintercept = mean(data$probsuccess[1:24]), color = "red", lty = "dashed") +
   geom_hline(yintercept = mean(data$probsuccess[25:34]), color = "blue", lty = "dashed") +
@@ -464,6 +480,32 @@ ggplot(data, aes(x = year, y = probsuccess, color = Site)) +
   )) +
   theme(legend.position = "bottom")
 ggsave("nest_survival/output/nest_success_prob_vs_year.jpg",width = 7, height = 5, dpi = 600)
+
+# Plot 2
+ggplot(annual_ns_estimates, aes(x = year, y = probsuccess, color = Site)) +
+  #geom_ribbon(aes(ymin = lcl, ymax = ucl), alpha = 0.13) +
+  geom_errorbar(aes(ymin = lci, ymax = uci, width = 0.4),
+                position = position_dodge(0.5)) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_hline(yintercept = mean(data$probsuccess[1:24]), color = "red", lty = "dashed") +
+  geom_hline(yintercept = mean(data$probsuccess[25:34]), color = "blue", lty = "dashed") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position = c(0.75, 0.3)) +
+  xlab("Year") + ylab("Estimated Nest Survival") +
+  theme_bw() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(axis.text.x = element_text(angle = 40, hjust = 1)) +
+  theme(axis.title.y = element_text(
+    size = 15
+  )) +
+  theme(axis.title.x = element_text(
+    size = 15
+  )) +
+  theme(legend.position = "bottom")
+ggsave("nest_survival/output/nest_success_prob_vs_year_dodge.jpg",width = 7, height = 5, dpi = 600)
 
 # Get simple statistics
 # Average nest success 
