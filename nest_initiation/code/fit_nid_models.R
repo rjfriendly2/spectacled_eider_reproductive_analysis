@@ -313,7 +313,7 @@ ggplot() +
   scale_color_manual(values = c("red", "blue")) +
   geom_hline(yintercept = mean(kig_fit6data$fit), color = "red", lty = "dashed") +
   geom_hline(yintercept = mean(utq_fit6data$fit), color = "blue", lty = "dashed") +
-  xlab("Winter Ice Days") + ylab("Initiation Date") +
+  xlab("Winter Ice Days") + ylab("Nest Initiation Date") +
   theme_bw() +
   theme(
     panel.grid.major = element_blank(),
@@ -337,7 +337,7 @@ ggplot() +
   scale_color_manual(values = c("red", "blue")) +
   geom_hline(yintercept = mean(kig_fit6data$dfit), color = "red", lty = "dashed") +
   geom_hline(yintercept = mean(utq_fit6data$dfit), color = "blue", lty = "dashed") +
-  xlab("Winter Ice Days") + ylab("Initiation Date") +
+  xlab("Winter Ice Days") + ylab("Nest Initiation Date") +
   theme_bw() +
   theme(
     panel.grid.major = element_blank(),

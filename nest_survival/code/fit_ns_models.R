@@ -858,7 +858,7 @@ ggplot(init.survival, aes(x = as.Date(init, origin = as.Date("1994-01-01")), y =
   geom_ribbon(aes(ymin = lci, ymax = uci), alpha = 0.13) +
   geom_line() +
   scale_color_manual(values = c("red","blue")) +
-  xlab("Nest Initiation Day") + ylab("Daily Nest Survival Probability") +
+  xlab("Nest Initiation Date") + ylab("Daily Nest Survival Probability") +
   theme_bw() +
   theme(
     panel.grid.major = element_blank(),
