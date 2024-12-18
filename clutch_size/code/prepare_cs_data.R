@@ -6,10 +6,13 @@ library(tidyverse) #helps to handle and transform data
 
 
 # 1. Load clutch size data and weather data.
-clutch_data <- read.csv("clutch_size/data/clutch_data.csv", header = TRUE)
+clutch_data <- read.csv("clutch_size/data/clutch_data_2.csv", header = TRUE)
 wx <- read.csv("nest_survival/data/ice_wx.csv", header = TRUE) #this only goes up to 2019
 wx2 <- read.csv("sea_ice_bs_core/output/sea_ice_vars_1979_2020.csv") # we grab 2020 ice data from here
 
+
+# 1.2 remove all rows that with any NA values from dataframe
+clutch_data <- na.omit(clutch_data)
 
 # 2. Add weather variables (win_hi) using ifelse statements
 clutch_data$win_hi <- ifelse(clutch_data$year == 1994,46,

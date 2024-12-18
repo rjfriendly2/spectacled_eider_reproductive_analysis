@@ -47,7 +47,8 @@ head(cs_data)
 
 # Fit mixed effect models
 # maxclutch ~ 1
-c1 <- lmer(maxclutch ~ 1 + (1|year), data = cs_data)
+c1 <- glmer(maxclutch ~ 1 + (1|year), data = cs_data,
+           family = poisson(link = "log"))
 summary(c1)
 # get output
 loglike <- logLik(c1)[1]
@@ -140,6 +141,18 @@ c6.sum <- summary(c6)
 print(c6.sum, digits=3)
 plot(ranef(c6))
 
+#c7 <- glm(maxclutch ~ Init, data = cs_data)
+#summary(c7)
+# get output
+#loglike <- logLik(c7)[1]
+#beta_c7 <- coef(summary(c7))[ ,"Estimate"]
+#k <- length(beta_c7)
+#model <- "init"
+
+# summary of model fit
+c7.sum <- summary(c7)
+print(c7.sum, digits=3)
+
 
 
 # AICc Model Selection
@@ -222,3 +235,20 @@ library(ggplot2)
 ggplot(kig_eggs, aes(x = year, y = maxclutch)) +
   geom_point() +
   theme(axis.text.x = element_text(angle = 40, hjust = 1))
+
+
+
+c7 <- glmer(maxclutch ~ 1 + (1|year) + Init, data = cs_data,
+            family = poisson(link = "log"))
+summary(c7)
+# get output
+loglike <- logLik(c7)[1]
+beta_c1 <- coef(summary(c1))[ ,"Estimate"]
+k <- length(beta_c7)
+model <- "null"
+
+# summary of model fit
+c1.sum <- summary(c7)
+print(c7.sum, digits=3)
+
+#
