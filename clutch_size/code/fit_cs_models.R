@@ -61,14 +61,14 @@ c1.sum <- summary(c1)
 print(c1.sum, digits=3)
 
 
-# maxclutch ~ sxt + sxw + Win_Hi + site + (1|year)
-c2 <- glmer(maxclutch ~ sxt + sxw + swin_hi[,1] + site + (1|year), 
+# maxclutch ~ sxt + sxw + Win_Hi + Init + site + (1|year)
+c2 <- glmer(maxclutch ~ sxt + sxw + swin_hi[,1] + Init + site + (1|year), 
             data = cs_data, family = poisson(link = "log")) #Peterson & Douglas
 summary(c2)
 loglike <- append(loglike, logLik(c2)[1])
 beta_c2 <- coef(summary(c2))[ ,"Estimate"]
 k <- append(k, length(beta_c2))
-model <- append(model, "sxt+sxw+win_hi+site")
+model <- append(model, "sxt+sxw+win_hi+init+site")
 
 # summary of model fit
 c2.sum <- summary(c2)
@@ -78,14 +78,14 @@ plot(c2)
 
 logLik(c2)
 AIC(c2)
-# maxclutch ~ sxt + sxw + Win_Hi + I(Win_Hi^2) + site + (1|year)
-c3 <- glmer(maxclutch ~ sxt + sxw + swin_hi[,1] + I(swin_hi[,1]^2) + site + (1|year), 
+# maxclutch ~ sxt + sxw + Win_Hi + I(Win_Hi^2) + Init + site + (1|year)
+c3 <- glmer(maxclutch ~ sxt + sxw + swin_hi[,1] + I(swin_hi[,1]^2) + Init + site + (1|year), 
             data = cs_data, family = poisson(link = "log")) #Peterson & Douglas
 summary(c3)
 loglike <- append(loglike, logLik(c3)[1])
 beta_c3 <- coef(summary(c3))[ ,"Estimate"]
 k <- append(k, length(beta_c3))
-model <- append(model, "sxt+sxw+win_hi+win_hi2+site")
+model <- append(model, "sxt+sxw+win_hi+win_hi2+init+site")
 
 # summary of model fit
 c3.sum <- summary(c3)
@@ -94,14 +94,14 @@ plot(ranef(c3))
 
 
 
-# maxclutch ~ wsi + site + (1|year)
-c4 <- glmer(maxclutch ~ swsi[,1] + site + (1|year), 
+# maxclutch ~ wsi + Init + site + (1|year)
+c4 <- glmer(maxclutch ~ swsi[,1] + Init + site + (1|year), 
             data = cs_data, family = poisson(link = "log")) #Paul Flint
 summary(c4)
 loglike <- append(loglike, logLik(c4)[1])
 beta_c4 <- coef(summary(c4))[ ,"Estimate"]
 k <- append(k, length(beta_c4))
-model <- append(model, "wsi+site")
+model <- append(model, "wsi+init+site")
 
 # summary of model fit
 c4.sum <- summary(c4)
@@ -111,14 +111,14 @@ plot(ranef(c4))
 
 
 
-# maxclutch ~ Win_Hi + I(Win_Hi^2) + site + (1|year)
-c5 <- glmer(maxclutch ~ swin_hi[,1] + I(swin_hi[,1]^2) + site + (1|year), 
+# maxclutch ~ Win_Hi + I(Win_Hi^2) + Init + site + (1|year)
+c5 <- glmer(maxclutch ~ swin_hi[,1] + I(swin_hi[,1]^2) + Init + site + (1|year), 
             data = cs_data, family = poisson(link = "log")) #Katie Christie
 summary(c5)
 loglike <- append(loglike, logLik(c5)[1])
 beta_c5 <- coef(summary(c5))[ ,"Estimate"]
 k <- append(k, length(beta_c5))
-model <- append(model, "win_hi+win_hi2+site")
+model <- append(model, "win_hi+win_hi2+init+site")
 
 # summary of model fit
 c5.sum <- summary(c5)
@@ -127,14 +127,14 @@ plot(ranef(c5))
 
 
 
-# maxclutch ~ Win_Hi + site + (1|year)
-c6 <- glmer(maxclutch ~ swin_hi[,1] + site + (1|year), 
+# maxclutch ~ Win_Hi + Init + site + (1|year)
+c6 <- glmer(maxclutch ~ swin_hi[,1] + Init + site + (1|year), 
             data = cs_data, family = poisson(link = "log")) #Paul Flint
 summary(c6)
 loglike <- append(loglike, logLik(c6)[1])
 beta_c6 <- coef(summary(c6))[ ,"Estimate"]
 k <- append(k, length(beta_c6))
-model <- append(model, "win_hi+site")
+model <- append(model, "win_hi+init+site")
 
 # summary of model fit
 c6.sum <- summary(c6)
@@ -150,8 +150,8 @@ plot(ranef(c6))
 #model <- "init"
 
 # summary of model fit
-c7.sum <- summary(c7)
-print(c7.sum, digits=3)
+#c7.sum <- summary(c7)
+#print(c7.sum, digits=3)
 
 
 
@@ -177,8 +177,8 @@ print(table, digits=2)
 
 # Save model oupput to output folder
 # Write the results output into excel (csv)
-clutch_model_table <- table
-write.csv(clutch_model_table, "clutch_size/output/clutch_model_table.csv")
+clutch_model_table_2 <- table
+write.csv(clutch_model_table_2, "clutch_size/output/clutch_model_table_2.csv")
 
 
 
@@ -193,24 +193,24 @@ library(plotrix) #used to get standard error
 std.error(kig_csdata$maxclutch) #0.021
 std.error(utq_csdata$maxclutch) #0.10
 aggregate(maxclutch ~ site, data = cs_data, FUN = mean)
-klci <- mean(kig_csdata$maxclutch) - 1.96*std.error(kig_csdata$maxclutch) #4.7478
-kuci <- mean(kig_csdata$maxclutch) + 1.96*std.error(kig_csdata$maxclutch) #4.8308
+klci <- mean(kig_csdata$maxclutch) - 1.96*std.error(kig_csdata$maxclutch) #4.75
+kuci <- mean(kig_csdata$maxclutch) + 1.96*std.error(kig_csdata$maxclutch) #4.83
 
-ulci <- mean(utq_csdata$maxclutch) - 1.96*std.error(utq_csdata$maxclutch) #4.1123
-uuci <- mean(utq_csdata$maxclutch) + 1.96*std.error(utq_csdata$maxclutch) #4.5030
-
-
+ulci <- mean(utq_csdata$maxclutch) - 1.96*std.error(utq_csdata$maxclutch) #4.01
+uuci <- mean(utq_csdata$maxclutch) + 1.96*std.error(utq_csdata$maxclutch) #4.46
 
 
-mean(cs_data$maxclutch) #4.761596
-std.error(cs_data$maxclutch) #0.02085693
+
+
+mean(cs_data$maxclutch) #4.77
+std.error(cs_data$maxclutch) #0.0209
 lci <- mean(cs_data$maxclutch) - 1.96*std.error(cs_data$maxclutch) #4.72
 uci <- mean(cs_data$maxclutch) + 1.96*std.error(cs_data$maxclutch) #4.80
 
 # Get overall mean
-m_clutch <- mean(cs_data$maxclutch)
+m_clutch <- mean(cs_data$maxclutch) #4.76
 # get sample size
-n <- length(cs_data$maxclutch)
+n <- length(cs_data$maxclutch) #2861
 # find standard deviation
 st.dev <- sd(cs_data$maxclutch)
 # get standard error
@@ -238,17 +238,3 @@ ggplot(kig_eggs, aes(x = year, y = maxclutch)) +
 
 
 
-c7 <- glmer(maxclutch ~ 1 + (1|year) + Init, data = cs_data,
-            family = poisson(link = "log"))
-summary(c7)
-# get output
-loglike <- logLik(c7)[1]
-beta_c1 <- coef(summary(c1))[ ,"Estimate"]
-k <- length(beta_c7)
-model <- "null"
-
-# summary of model fit
-c1.sum <- summary(c7)
-print(c7.sum, digits=3)
-
-#
