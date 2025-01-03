@@ -219,3 +219,4 @@ clutch_data$wsi <- ifelse(clutch_data$year == 1994,127.995,
 
 ### 8. write the csv file in the data folder
 write.csv(clutch_data, "clutch_size/data/clutch_wx.csv")
+
