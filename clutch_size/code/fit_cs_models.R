@@ -4,6 +4,8 @@
 library(lme4) #used for modeling mixed effects models
 library(data.table) #for easy data manipulation and visuals
 library(optimx) #another method for optimzation in model fitting
+library(plotrix) #can use to get standard error
+library(merTools)
 
 # Load data
 cs_data <- read.csv("clutch_size/data/clutch_wx.csv", header = TRUE)
@@ -35,11 +37,13 @@ hist(cs_data$wsi)
 head(cs_data)
 
 # Standardize variables
-cs_data$cwin_hi <- cs_data$win_hi - mean(cs_data$win_hi)
+#cs_data$cwin_hi <- cs_data$win_hi - mean(cs_data$win_hi)
 cs_data$swin_hi <- scale(cs_data$win_hi, center = TRUE, scale = TRUE) #standardized, to center only set scale=FALSE
 # 
-cs_data$cwsi <- cs_data$wsi - mean(cs_data$wsi)
+#cs_data$cwsi <- cs_data$wsi - mean(cs_data$wsi)
 cs_data$swsi <- scale(cs_data$wsi, center = TRUE, scale = TRUE) #standardized
+#
+cs_data$sInit <- scale(cs_data$Init, center = TRUE, scale = TRUE) #standardized
 
 head(cs_data)
 
@@ -62,7 +66,7 @@ print(c1.sum, digits=3)
 
 
 # maxclutch ~ sxt + sxw + Win_Hi + Init + site + (1|year)
-c2 <- glmer(maxclutch ~ sxt + sxw + swin_hi[,1] + Init + site + (1|year), 
+c2 <- glmer(maxclutch ~ sxt + sxw + swin_hi + sInit + site + (1|year), 
             data = cs_data, family = poisson(link = "log")) #Peterson & Douglas
 summary(c2)
 loglike <- append(loglike, logLik(c2)[1])
@@ -78,8 +82,10 @@ plot(c2)
 
 logLik(c2)
 AIC(c2)
+
+
 # maxclutch ~ sxt + sxw + Win_Hi + I(Win_Hi^2) + Init + site + (1|year)
-c3 <- glmer(maxclutch ~ sxt + sxw + swin_hi[,1] + I(swin_hi[,1]^2) + Init + site + (1|year), 
+c3 <- glmer(maxclutch ~ sxt + sxw + swin_hi + I(swin_hi^2) + sInit + site + (1|year), 
             data = cs_data, family = poisson(link = "log")) #Peterson & Douglas
 summary(c3)
 loglike <- append(loglike, logLik(c3)[1])
@@ -95,7 +101,7 @@ plot(ranef(c3))
 
 
 # maxclutch ~ wsi + Init + site + (1|year)
-c4 <- glmer(maxclutch ~ swsi[,1] + Init + site + (1|year), 
+c4 <- glmer(maxclutch ~ swsi + sInit + site + (1|year), 
             data = cs_data, family = poisson(link = "log")) #Paul Flint
 summary(c4)
 loglike <- append(loglike, logLik(c4)[1])
@@ -112,7 +118,7 @@ plot(ranef(c4))
 
 
 # maxclutch ~ Win_Hi + I(Win_Hi^2) + Init + site + (1|year)
-c5 <- glmer(maxclutch ~ swin_hi[,1] + I(swin_hi[,1]^2) + Init + site + (1|year), 
+c5 <- glmer(maxclutch ~ swin_hi + I(swin_hi^2) + sInit[,1] + site + (1|year), 
             data = cs_data, family = poisson(link = "log")) #Katie Christie
 summary(c5)
 loglike <- append(loglike, logLik(c5)[1])
@@ -128,7 +134,7 @@ plot(ranef(c5))
 
 
 # maxclutch ~ Win_Hi + Init + site + (1|year)
-c6 <- glmer(maxclutch ~ swin_hi[,1] + Init + site + (1|year), 
+c6 <- glmer(maxclutch ~ swin_hi + sInit + site + (1|year), 
             data = cs_data, family = poisson(link = "log")) #Paul Flint
 summary(c6)
 loglike <- append(loglike, logLik(c6)[1])
@@ -235,6 +241,111 @@ library(ggplot2)
 ggplot(kig_eggs, aes(x = year, y = maxclutch)) +
   geom_point() +
   theme(axis.text.x = element_text(angle = 40, hjust = 1))
+
+
+# Get confidence intervals from the top model (c6)
+# winter ice days
+# beta = 0.03517
+# std. error = 0.01995
+win_ice_upper <- 0.03517 + 1.96*0.01995 #0.074
+win_ice_lower <- 0.03517 - 1.96*0.01995 #-0.003
+# initiation date
+# beta = -0.07582
+# std. error = 0.01237
+init_upper <- (-0.07582) + (1.96*0.01237) #-0.0515
+init_lower <- (-0.07582) - (1.96*0.01237) #0.-0.1000
+
+summary(c6)
+
+# exponentiate the fixed effects coefficients to get rates on natural scale
+exp(fixef(c6)) #
+exp(-0.07582) # the above code worked.
+# get the CI for the fixed effects (log scale)
+confint(c6)
+exp(confint(c6)) # get the CI for the fixed effects (natural scale) 
+
+confint.merMod(c6)
+
+#c6.CI <- predictInterval(fit_6, newdata = data1, which = "fixed",
+                           #level = 0.95, n.sims = 1000, stat = "median",
+                           #include.resid.var = FALSE)
+
+###############################################################################
+
+# Graphing preparation
+
+# Add model fits to dataframe
+cs_data$fit <- predict(c6) #this gives out the mean clutch size for each year and site
+
+# Create a new data frame with values for which model estimates
+cs_data_ice <- data.frame(c("Kigigak Island","Utqiaġvik"), ice = rep(rep(-2.3918018:1.6013187),each =2),1)
+cs_data_ice <- cs_data_ice[, -3]
+names(cs_data_ice) <- c("Site","swin_hi")
+is.factor(cs_data_ice$Site)
+cs_data_ice$Site <- as.factor(cs_data_ice$Site)
+summary(cs_data_ice)
+head(cs_data_ice)
+str(cs_data_ice)
+
+# Find random intercept year that is average
+#averageObs(c6) # this is the reference level year
+# add new reference level year
+#colyear <- rep("2003", 8)
+# Add ref level to new data frame
+#cs_data_ice$Year <- colyear
+
+fit.c6 <- predictInterval(c6, newdata = cs_data_ice, which = "fixed",
+                          level = 0.95, n.sims = 1000, stat = "median",
+                          include.resid.var = FALSE)
+
+
+#################################################################
+# define range for predicitons
+swin_hi <- seq(min(cs_data$swin_hi), max(cs_data$swin_hi), length = 100)
+sInit <- seq(min(cs_data$sInit), max(cs_data$sInit), length = 100)
+summary(swin_hi)
+summary(sInit)
+
+data1 <- data.frame(swin_hi = swin_hi,
+                    sInit = sInit)
+data1$site <- "kig"
+
+data2 <- data.frame(swin_hi = swin_hi,
+                    sInit = sInit)
+data2$site <- "utq"
+
+#merge the two data frames
+clutch_pred <- rbind(data1, data2)
+summary(clutch_pred)
+clutch_pred$site <- as.factor(clutch_pred$site)
+is.factor(clutch_pred$site)
+
+
+
+clutch_pred$predict_count <- predict(c6,newdata = clutch_pred,
+                       re.form = NA,
+                       type = "response")
+
+cet the 95% CI
+
+
+
+fit.c6 <- predictInterval(c6, newdata = clutch_pred, which = "fixed",
+                          level = 0.95, n.sims = 1000, stat = "mean",
+                          include.resid.var = FALSE)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
