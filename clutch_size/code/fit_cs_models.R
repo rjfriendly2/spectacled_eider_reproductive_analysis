@@ -6,6 +6,7 @@ library(data.table) #for easy data manipulation and visuals
 library(optimx) #another method for optimzation in model fitting
 library(plotrix) #can use to get standard error
 library(merTools)
+library(ggeffects)
 
 # Load data
 cs_data <- read.csv("clutch_size/data/clutch_wx.csv", header = TRUE)
@@ -147,18 +148,6 @@ c6.sum <- summary(c6)
 print(c6.sum, digits=3)
 plot(ranef(c6))
 
-#c7 <- glm(maxclutch ~ Init, data = cs_data)
-#summary(c7)
-# get output
-#loglike <- logLik(c7)[1]
-#beta_c7 <- coef(summary(c7))[ ,"Estimate"]
-#k <- length(beta_c7)
-#model <- "init"
-
-# summary of model fit
-#c7.sum <- summary(c7)
-#print(c7.sum, digits=3)
-
 
 
 # AICc Model Selection
@@ -198,7 +187,7 @@ mean(utq_csdata$maxclutch) #4.3
 library(plotrix) #used to get standard error
 std.error(kig_csdata$maxclutch) #0.021
 std.error(utq_csdata$maxclutch) #0.10
-aggregate(maxclutch ~ site, data = cs_data, FUN = mean)
+aggregate(maxclutch ~ site, data = cs_data, FUN = mean) # get the mean for two sites from main data
 klci <- mean(kig_csdata$maxclutch) - 1.96*std.error(kig_csdata$maxclutch) #4.75
 kuci <- mean(kig_csdata$maxclutch) + 1.96*std.error(kig_csdata$maxclutch) #4.83
 
@@ -230,7 +219,7 @@ upper_bound <- m_clutch + mar_of_error
 
 
 # Average clutch sizes per year
-aggregate(maxclutch ~ year, data = cs_data, FUN = mean)
+aggregate(maxclutch ~ year, data = cs_data, FUN = mean) # get mean clutch size for each year both sites combined
 
 # average clutch sizes per year at each site
 kig_eggs <- aggregate(maxclutch ~ year, data = kig_csdata, FUN = mean)
@@ -243,13 +232,19 @@ ggplot(kig_eggs, aes(x = year, y = maxclutch)) +
   theme(axis.text.x = element_text(angle = 40, hjust = 1))
 
 
+############# TOP MODEL #########################
+# c6 <- glmer(maxclutch ~ swin_hi + sInit + site + (1|year)
+################################################
+
 # Get confidence intervals from the top model (c6)
-# winter ice days
+# winter ice days (swin_hi)
 # beta = 0.03517
 # std. error = 0.01995
 win_ice_upper <- 0.03517 + 1.96*0.01995 #0.074
 win_ice_lower <- 0.03517 - 1.96*0.01995 #-0.003
-# initiation date
+# the CIs overlap zero, is this important? No?
+
+# initiation date (sInit)
 # beta = -0.07582
 # std. error = 0.01237
 init_upper <- (-0.07582) + (1.96*0.01237) #-0.0515
@@ -258,17 +253,15 @@ init_lower <- (-0.07582) - (1.96*0.01237) #0.-0.1000
 summary(c6)
 
 # exponentiate the fixed effects coefficients to get rates on natural scale
-exp(fixef(c6)) #
+exp(fixef(c6)) # get the beta estimates on Probability scale
 exp(-0.07582) # the above code worked.
 # get the CI for the fixed effects (log scale)
 confint(c6)
-exp(confint(c6)) # get the CI for the fixed effects (natural scale) 
+exp(confint(c6)) # get the CI for the fixed effects (probability scale) 
 
 confint.merMod(c6)
 
-#c6.CI <- predictInterval(fit_6, newdata = data1, which = "fixed",
-                           #level = 0.95, n.sims = 1000, stat = "median",
-                           #include.resid.var = FALSE)
+
 
 ###############################################################################
 
@@ -300,50 +293,232 @@ fit.c6 <- predictInterval(c6, newdata = cs_data_ice, which = "fixed",
 
 
 #################################################################
-# define range for predicitons
-swin_hi <- seq(min(cs_data$swin_hi), max(cs_data$swin_hi), length = 100)
-sInit <- seq(min(cs_data$sInit), max(cs_data$sInit), length = 100)
-summary(swin_hi)
-summary(sInit)
+######################### NOTE!!!!!!!! ##########################
+# If you are going to use "predictInterval". When you create a 
+# a dataframe to get predicted values, you have to create a dataframe
+# that includes all of the variables from the model you are working with.
+# You'll either have to have to have the variables all ranged out or
+# hold some of them constant, to correctly interpret what you need.
+#################################################################
 
-data1 <- data.frame(swin_hi = swin_hi,
-                    sInit = sInit)
+
+# winter ice days (swin_hi)
+# beta = 0.03517
+# std. error = 0.01995
+
+# initiation date (sInit)
+# beta = -0.07582
+# std. error = 0.01237
+
+
+
+#### see the trend of count of eggs as a function of predicted values
+
+averageObs(c6)
+# define range for predictions
+sInit <- seq(min(cs_data$sInit), max(cs_data$sInit), length = 100)
+summary(sInit)
+data1 <- as.data.frame(sInit)
 data1$site <- "kig"
 
-data2 <- data.frame(swin_hi = swin_hi,
-                    sInit = sInit)
+data2 <- sInit
 data2$site <- "utq"
 
-#merge the two data frames
-clutch_pred <- rbind(data1, data2)
-summary(clutch_pred)
-clutch_pred$site <- as.factor(clutch_pred$site)
-is.factor(clutch_pred$site)
+data3 <- rbind(data1, data2) # combine two data
+data3$year <- "2003"
+
+data3$swin_hi <- 0.03517
 
 
+predictions2 <- predictInterval(
+  merMod = c6,
+  newdata = data3,
+  level = 0.95, # 95% confidence interval
+  n.sims = 1000, # Number of simulations for interval estimation
+  which = "fixed", # use fixed effects for population level predicitons
+  include.resid.var = FALSE
+  )
 
-clutch_pred$predict_count <- predict(c6,newdata = clutch_pred,
-                       re.form = NA,
-                       type = "response")
+### combine the two data frames
+clutch_predictions <- cbind(data3,predictions2)
 
-cet the 95% CI
-
-
-
-fit.c6 <- predictInterval(c6, newdata = clutch_pred, which = "fixed",
-                          level = 0.95, n.sims = 1000, stat = "mean",
-                          include.resid.var = FALSE)
-
-
-
-
-
-
+clutch_predictions$rinit <- exp(clutch_predictions$sInit)
+clutch_predictions$rfit <- exp(clutch_predictions$fit)
+clutch_predictions$rupr <- exp(clutch_predictions$upr)
+clutch_predictions$rlwr <- exp(clutch_predictions$lwr)
 
 
 
 
 
+
+# c6 <- glmer(maxclutch ~ swin_hi + sInit + site + (1|year),
+summary(c6)
+summary(cs_data)
+
+# estimate clutch size at min max and mean values of init
+#predict(c6, data.frame(sInit = -2.54588574, site = "kig", year = 2003))
+#predictInterval(c6, data.frame(sInit = -2.545886, site = "kig", year = 2003))
+
+#predict(c6, newdata = clutch_predictions, data.frame(
+        #site = "kig",
+       # year = 2003,
+        #type = "response"))
+
+##############################################
+
+
+min_init <- data.frame(
+  swin_hi = 0,
+  sInit = -2.54588574,
+  site = "kig",
+  year = "2003"
+)
+
+predict(c6, newdata = min_init)
+predictInterval(c6, newdata = min_init)
+min_init_results <- exp(predictInterval(c6, newdata = min_init))
+# kig eggs at min init = 6.06 (1.5, 21.8)
+
+
+
+mean_init <- data.frame(
+  swin_hi = 0,
+  sInit = 0,
+  site = "kig",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = mean_init))
+# kig eggs at mean init = 4.7 (1.3, 17.8)
+
+
+
+max_init <- data.frame(
+  swin_hi = 0,
+  sInit = 4.31967593,
+  site = "kig",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = max_init))
+# kig eggs at mean init = 3.3 (0.8, 12.2)
+
+
+
+####################################
+summary(cs_data)
+
+
+min_swin_hi <- data.frame(
+  swin_hi = -2.3918018,
+  sInit = 0,
+  site = "kig",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = min_swin_hi))
+# kig eggs at min ice = 4.6 (1.3, 15.8)
+
+
+mean_swin_hi <- data.frame(
+  swin_hi = 0,
+  sInit = 0,
+  site = "kig",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = mean_swin_hi))
+# kig eggs at mean ice = 4.7 (1.4, 17.7)
+
+
+max_swin_hi <- data.frame(
+  swin_hi = 1.6013187,
+  sInit = 0,
+  site = "kig",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = max_swin_hi))
+# kig eggs at max ice = 4.8 (1.3, 16.7)
+
+
+####################################################
+
+## UTQ
+
+
+umin_init <- data.frame(
+  swin_hi = 0,
+  sInit = -2.54588574,
+  site = "utq",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = umin_init))
+# utq eggs at min init = 6.7 (1.8, 25.0)
+
+
+
+umean_init <- data.frame(
+  swin_hi = 0,
+  sInit = 0,
+  site = "utq",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = umean_init))
+# utq eggs at mean init = 5.27 (1.3, 16.8)
+
+
+
+umax_init <- data.frame(
+  swin_hi = 0,
+  sInit = 4.31967593,
+  site = "utq",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = umax_init))
+# utq eggs at mean init = 3.6 (0.9, 14.5)
+
+
+
+####################################
+summary(cs_data)
+
+
+umin_swin_hi <- data.frame(
+  swin_hi = -2.3918018,
+  sInit = 0,
+  site = "utq",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = umin_swin_hi))
+# utq eggs at min ice = 4.7 (1.4, 16.7)
+
+
+umean_swin_hi <- data.frame(
+  swin_hi = 0,
+  sInit = 0,
+  site = "utq",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = umean_swin_hi))
+# utq eggs at mean ice = 5.1 (1.4, 19.4)
+
+
+umax_swin_hi <- data.frame(
+  swin_hi = 1.6013187,
+  sInit = 0,
+  site = "utq",
+  year = "2003"
+)
+
+exp(predictInterval(c6, newdata = umax_swin_hi))
+# utq eggs at max ice = 5.9 (1.5, 20.0)
 
 
 
