@@ -7,6 +7,8 @@ library(optimx) #another method for optimzation in model fitting
 library(plotrix) #can use to get standard error
 library(merTools)
 library(ggeffects)
+library(ggplot2)
+library(dplyr)
 
 # Load data
 cs_data <- read.csv("clutch_size/data/clutch_wx.csv", header = TRUE)
@@ -37,6 +39,10 @@ hist(cs_data$sxw)
 hist(cs_data$wsi)
 head(cs_data)
 
+# Frequencies of each clutch size
+clutch_freq <- table(cs_data$maxclutch)
+print(clutch_freq)
+
 # Standardize variables
 #cs_data$cwin_hi <- cs_data$win_hi - mean(cs_data$win_hi)
 cs_data$swin_hi <- scale(cs_data$win_hi, center = TRUE, scale = TRUE) #standardized, to center only set scale=FALSE
@@ -48,6 +54,41 @@ cs_data$sInit <- scale(cs_data$Init, center = TRUE, scale = TRUE) #standardized
 
 head(cs_data)
 
+####################################### 
+# Make a graph to visualize data to see if there are any outliers
+### 
+ggplot(cs_data, aes(x = maxclutch)) +
+  geom_histogram(binwidth = 1, color = "black", fill = "skyblue") +
+  geom_text(stat = 'bin', aes(label = ..count..), vjust = -0.5, binwidth = 1) +
+  theme_minimal()
+
+### the nest with 10 eggs have 5 nopi eggs. Change the value to 5 from nest JKL036
+cs_data <- cs_data %>%
+  mutate(maxclutch = ifelse(Nest == "JKL036", 5, maxclutch))
+
+# check data summary
+summary(cs_data)
+
+### TLM062 has 8 eggs, but notes say 4 spri and 4 coei. change maxclutch value to 4 from 8.
+cs_data <- cs_data %>%
+  mutate(maxclutch = ifelse(Nest == "TLM062", 4, maxclutch))
+
+### 18-MWM037 has 8 eggs, and that one egg was dump egg. change maxclutch value to 7
+cs_data <- cs_data %>%
+  mutate(maxclutch = ifelse(Nest == "18-MWM037", 7, maxclutch))
+
+# Frequencies of each clutch size
+clutch_freq <- table(cs_data$maxclutch)
+print(clutch_freq)
+
+
+### Graph again
+ggplot(cs_data, aes(x = maxclutch)) +
+  geom_histogram(binwidth = 1, color = "black", fill = "skyblue") +
+  geom_text(stat = 'bin', aes(label = ..count..), vjust = -0.5, binwidth = 1) +
+  theme_minimal()
+
+##############################################################################
 
 
 # Fit mixed effect models
@@ -181,12 +222,12 @@ write.csv(clutch_model_table_2, "clutch_size/output/clutch_model_table_2.csv")
 kig_csdata <- cs_data[cs_data$site == "kig",]
 utq_csdata <- cs_data[cs_data$site == "utq",]
 mean(kig_csdata$maxclutch) #4.8
-mean(utq_csdata$maxclutch) #4.3
+mean(utq_csdata$maxclutch) #4.2
 
 # Activate package
 library(plotrix) #used to get standard error
 std.error(kig_csdata$maxclutch) #0.021
-std.error(utq_csdata$maxclutch) #0.10
+std.error(utq_csdata$maxclutch) #0.11
 aggregate(maxclutch ~ site, data = cs_data, FUN = mean) # get the mean for two sites from main data
 klci <- mean(kig_csdata$maxclutch) - 1.96*std.error(kig_csdata$maxclutch) #4.75
 kuci <- mean(kig_csdata$maxclutch) + 1.96*std.error(kig_csdata$maxclutch) #4.83
@@ -197,8 +238,8 @@ uuci <- mean(utq_csdata$maxclutch) + 1.96*std.error(utq_csdata$maxclutch) #4.46
 
 
 
-mean(cs_data$maxclutch) #4.77
-std.error(cs_data$maxclutch) #0.0209
+mean(cs_data$maxclutch) #4.76
+std.error(cs_data$maxclutch) #0.0208
 lci <- mean(cs_data$maxclutch) - 1.96*std.error(cs_data$maxclutch) #4.72
 uci <- mean(cs_data$maxclutch) + 1.96*std.error(cs_data$maxclutch) #4.80
 
@@ -267,85 +308,362 @@ confint.merMod(c6)
 
 # Graphing preparation
 
-# Add model fits to dataframe
-cs_data$fit <- predict(c6) #this gives out the mean clutch size for each year and site
 
-# Create a new data frame with values for which model estimates
-cs_data_ice <- data.frame(c("Kigigak Island","Utqiaġvik"), ice = rep(rep(-2.3918018:1.6013187),each =2),1)
-cs_data_ice <- cs_data_ice[, -3]
-names(cs_data_ice) <- c("Site","swin_hi")
-is.factor(cs_data_ice$Site)
-cs_data_ice$Site <- as.factor(cs_data_ice$Site)
-summary(cs_data_ice)
-head(cs_data_ice)
-str(cs_data_ice)
+##################### TOP MODEL ###############################
 
-# Find random intercept year that is average
-#averageObs(c6) # this is the reference level year
-# add new reference level year
-#colyear <- rep("2003", 8)
-# Add ref level to new data frame
-#cs_data_ice$Year <- colyear
+# c6 <- glmer(maxclutch ~ swin_hi + sInit + site + (1|year)
 
-fit.c6 <- predictInterval(c6, newdata = cs_data_ice, which = "fixed",
-                          level = 0.95, n.sims = 1000, stat = "median",
-                          include.resid.var = FALSE)
+################################################################
 
 
-#################################################################
-######################### NOTE!!!!!!!! ##########################
-# If you are going to use "predictInterval". When you create a 
-# a dataframe to get predicted values, you have to create a dataframe
-# that includes all of the variables from the model you are working with.
-# You'll either have to have to have the variables all ranged out or
-# hold some of them constant, to correctly interpret what you need.
-#################################################################
+# first let's extract beta coefficients along with their 95% CIs
+beta_coeff1 <- fixef(c6) # extract fixed effects
+print(beta_coeff1)
 
+conf_int1 <- confint(c6, method = "profile")
+print(conf_int1)
+conf_int1 <- conf_int1[-1, ]
+print(conf_int1)
 
-# winter ice days (swin_hi)
-# beta = 0.03517
-# std. error = 0.01995
+# combine beta coeff with CIs
+results1 <- data.frame(
+  Estimate = beta_coeff1,
+  low.95 = conf_int1[, 1],
+  up.95 = conf_int1[, 2]
+)
+print(results1)
 
-# initiation date (sInit)
-# beta = -0.07582
-# std. error = 0.01237
+#save beta coeff and ci
+write.csv(results1, "clutch_size/output/model1_fixedeffects.csv")
 
 
 
-#### see the trend of count of eggs as a function of predicted values
+### work on getting predicted values
 
-averageObs(c6)
-# define range for predictions
-sInit <- seq(min(cs_data$sInit), max(cs_data$sInit), length = 100)
-summary(sInit)
-data1 <- as.data.frame(sInit)
-data1$site <- "kig"
+#c6 <- glmer(maxclutch ~ swin_hi + sInit + site + (1|year)
 
-data2 <- sInit
-data2$site <- "utq"
+####################################
+############## sInit ###############
+#####################################
 
-data3 <- rbind(data1, data2) # combine two data
-data3$year <- "2003"
-
-data3$swin_hi <- 0.03517
+predicted_mmm <- ggpredict(c6, terms = "sInit [min, mean, max]") # predict for min mean and max
+write.csv(predicted_mmm, "clutch_size/output/predicted_min_mean_max_init.csv")
 
 
-predictions2 <- predictInterval(
-  merMod = c6,
-  newdata = data3,
-  level = 0.95, # 95% confidence interval
-  n.sims = 1000, # Number of simulations for interval estimation
-  which = "fixed", # use fixed effects for population level predicitons
-  include.resid.var = FALSE
-  )
+predicted_sInit <- ggpredict(c6, terms = c("sInit", "site")) # predict for both sites
 
-### combine the two data frames
-clutch_predictions <- cbind(data3,predictions2)
 
-clutch_predictions$rinit <- exp(clutch_predictions$sInit)
-clutch_predictions$rfit <- exp(clutch_predictions$fit)
-clutch_predictions$rupr <- exp(clutch_predictions$upr)
-clutch_predictions$rlwr <- exp(clutch_predictions$lwr)
+### Change names and values in the data
+colnames(predicted_sInit)[colnames(predicted_sInit) == "group"] <- "Site" # change 'group' to 'Site'
+predicted_sInit$Site <- as.character(predicted_sInit$Site) # so we can change the names below
+predicted_sInit$Site[predicted_sInit$Site == "kig"] <- "Kigigak Island"
+predicted_sInit$Site[predicted_sInit$Site == "utq"] <- "Utqiaġvik"
+predicted_sInit$Site <- as.factor(predicted_sInit$Site) # make it a factor variable again
+write.csv(predicted_sInit, "clutch_size/output/predicted_init_site.csv")
+
+ggplot(predicted_sInit, aes(x = x, y = predicted, color = Site, fill = Site)) + 
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = Site), 
+              alpha = 0.2) +
+  geom_line() +
+  labs(
+    x = "Standardized Nest Initiation Date",
+    y = "Predicted Clutch Size",
+    color = "Site"
+  ) +
+  scale_color_manual(values = c("red","blue")) +
+  theme_bw() + 
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(axis.title.x = element_text(size = 15)) +
+  theme(axis.title.y = element_text(size = 15)) +
+  theme(legend.position = "bottom")
+ggsave("clutch_size/output/clutch_sInit.jpg", width = 7, height = 5, dpi = 600)
+
+
+
+### work on getting predicted values
+
+####################################
+############## swin_hi ###############
+#####################################
+
+predicted_swin_hi_mmm <- ggpredict(c6, terms = "swin_hi [min, mean, max]") # predict for min mean and max
+write.csv(predicted_swin_hi_mmm, "clutch_size/output/predicted_min_mean_max_swin_hi.csv")
+
+
+predicted_swin_hi <- ggpredict(c6, terms = c("swin_hi", "site")) # predict for both sites
+
+
+### Change names and values in the data
+colnames(predicted_swin_hi)[colnames(predicted_swin_hi) == "group"] <- "Site" # change 'group' to 'Site'
+predicted_swin_hi$Site <- as.character(predicted_swin_hi$Site) # so we can change the names below
+predicted_swin_hi$Site[predicted_swin_hi$Site == "kig"] <- "Kigigak Island"
+predicted_swin_hi$Site[predicted_swin_hi$Site == "utq"] <- "Utqiaġvik"
+predicted_swin_hi$Site <- as.factor(predicted_swin_hi$Site) # make it a factor variable again
+write.csv(predicted_swin_hi, "clutch_size/output/predicted_swin_hi_site.csv")
+
+ggplot(predicted_swin_hi, aes(x = x, y = predicted, color = Site, fill = Site)) + 
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = Site), 
+              alpha = 0.2) +
+  geom_line() +
+  labs(
+    x = "Standardized Winter Ice Days",
+    y = "Predicted Clutch Size",
+    color = "Site"
+  ) +
+  scale_color_manual(values = c("red","blue")) +
+  theme_bw() + 
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(axis.title.x = element_text(size = 15)) +
+  theme(axis.title.y = element_text(size = 15)) +
+  theme(legend.position = "bottom")
+ggsave("clutch_size/output/clutch_swin_hi.jpg", width = 7, height = 5, dpi = 600)
+
+
+
+
+
+
+
+##################### 2nd RANKED MODEL #########################
+
+# c4 <- glmer(maxclutch ~ swsi + sInit + site + (1|year)
+
+################################################################
+
+
+####################################
+############## swsi ###############
+#####################################
+
+# first let's extract beta coefficients along with their 95% CIs
+beta_coeff2 <- fixef(c4) # extract fixed effects
+print(beta_coeff2)
+
+conf_int2 <- confint(c4, method = "profile")
+print(conf_int2)
+conf_int2 <- conf_int2[-1, ]
+print(conf_int2)
+
+# combine beta coeff with CIs
+results2 <- data.frame(
+  Estimate = beta_coeff2,
+  low.95 = conf_int2[, 1],
+  up.95 = conf_int2[, 2]
+)
+print(results1)
+
+#save beta coeff and ci
+write.csv(results2, "clutch_size/output/model2_fixedeffects.csv")
+
+
+predicted_swsi_mmm <- ggpredict(c4, terms = "swsi [min, mean, max]") # predict for min mean and max
+write.csv(predicted_swsi_mmm, "clutch_size/output/predicted_min_mean_max_swsi.csv")
+
+
+predicted_swsi <- ggpredict(c4, terms = c("swsi", "site")) # predict for both sites
+
+
+### Change names and values in the data
+colnames(predicted_swsi)[colnames(predicted_swsi) == "group"] <- "Site" # change 'group' to 'Site'
+predicted_swsi$Site <- as.character(predicted_swsi$Site) # so we can change the names below
+predicted_swsi$Site[predicted_swsi$Site == "kig"] <- "Kigigak Island"
+predicted_swsi$Site[predicted_swsi$Site == "utq"] <- "Utqiaġvik"
+predicted_swsi$Site <- as.factor(predicted_swsi$Site) # make it a factor variable again
+write.csv(predicted_swsi, "clutch_size/output/predicted_swsi_site.csv")
+
+ggplot(predicted_swsi, aes(x = x, y = predicted, color = Site, fill = Site)) + 
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = Site), 
+              alpha = 0.2) +
+  geom_line() +
+  labs(
+    x = "Standardized Winter Ice Index",
+    y = "Predicted Clutch Size",
+    color = "Site"
+  ) +
+  scale_color_manual(values = c("red","blue")) +
+  theme_bw() + 
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(axis.title.x = element_text(size = 15)) +
+  theme(axis.title.y = element_text(size = 15)) +
+  theme(legend.position = "bottom")
+ggsave("clutch_size/output/clutch_wsi.jpg", width = 7, height = 5, dpi = 600)
+
+
+
+
+
+##################### 3nd RANKED MODEL #########################
+
+# c4 <- glmer(maxclutch ~ swsi + sInit + site + (1|year)
+
+################################################################
+
+
+####################################
+############## 3rd ###############
+#####################################
+
+# maxclutch ~ sxt + sxw + Win_Hi + Init + site + (1|year)
+
+# first let's extract beta coefficients along with their 95% CIs
+beta_coeff3 <- fixef(c2) # extract fixed effects
+print(beta_coeff3)
+
+conf_int3 <- confint(c2, method = "profile")
+print(conf_int3)
+conf_int3 <- conf_int3[-1, ]
+print(conf_int3)
+
+# combine beta coeff with CIs
+results3 <- data.frame(
+  Estimate = beta_coeff3,
+  low.95 = conf_int3[, 1],
+  up.95 = conf_int3[, 2]
+)
+print(results3)
+
+#save beta coeff and ci
+write.csv(results3, "clutch_size/output/model3_fixedeffects.csv")
+
+#### sxt
+
+predicted_sxt_mmm <- ggpredict(c2, terms = "sxt [min, mean, max]") # predict for min mean and max
+write.csv(predicted_sxt_mmm, "clutch_size/output/predicted_min_mean_max_sxt.csv")
+
+
+predicted_sxt <- ggpredict(c2, terms = c("sxt", "site")) # predict for both sites
+
+
+### Change names and values in the data
+colnames(predicted_sxt)[colnames(predicted_sxt) == "group"] <- "Site" # change 'group' to 'Site'
+predicted_sxt$Site <- as.character(predicted_sxt$Site) # so we can change the names below
+predicted_sxt$Site[predicted_sxt$Site == "kig"] <- "Kigigak Island"
+predicted_sxt$Site[predicted_sxt$Site == "utq"] <- "Utqiaġvik"
+predicted_sxt$Site <- as.factor(predicted_sxt$Site) # make it a factor variable again
+write.csv(predicted_sxt, "clutch_size/output/predicted_sxt_site.csv")
+
+ggplot(predicted_sxt, aes(x = x, y = predicted, color = Site, fill = Site)) + 
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = Site), 
+              alpha = 0.2) +
+  geom_line() +
+  labs(
+    x = "Spring Extreme Temp Days",
+    y = "Predicted Clutch Size",
+    color = "Site"
+  ) +
+  scale_color_manual(values = c("red","blue")) +
+  theme_bw() + 
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(axis.title.x = element_text(size = 15)) +
+  theme(axis.title.y = element_text(size = 15)) +
+  theme(legend.position = "bottom")
+ggsave("clutch_size/output/clutch_sxt.jpg", width = 7, height = 5, dpi = 600)
+
+
+
+
+#### sxw
+
+predicted_sxw_mmm <- ggpredict(c2, terms = "sxw [min, mean, max]") # predict for min mean and max
+write.csv(predicted_sxw_mmm, "clutch_size/output/predicted_min_mean_max_sxw.csv")
+
+
+predicted_sxw <- ggpredict(c2, terms = c("sxw", "site")) # predict for both sites
+
+
+### Change names and values in the data
+colnames(predicted_sxw)[colnames(predicted_sxw) == "group"] <- "Site" # change 'group' to 'Site'
+predicted_sxw$Site <- as.character(predicted_sxw$Site) # so we can change the names below
+predicted_sxw$Site[predicted_sxw$Site == "kig"] <- "Kigigak Island"
+predicted_sxw$Site[predicted_sxw$Site == "utq"] <- "Utqiaġvik"
+predicted_sxw$Site <- as.factor(predicted_sxw$Site) # make it a factor variable again
+write.csv(predicted_sxw, "clutch_size/output/predicted_sxw_site.csv")
+
+ggplot(predicted_sxw, aes(x = x, y = predicted, color = Site, fill = Site)) + 
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = Site), 
+              alpha = 0.2) +
+  geom_line() +
+  labs(
+    x = "Spring Extreme Wind Days",
+    y = "Predicted Clutch Size",
+    color = "Site"
+  ) +
+  scale_color_manual(values = c("red","blue")) +
+  theme_bw() + 
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(axis.title.x = element_text(size = 15)) +
+  theme(axis.title.y = element_text(size = 15)) +
+  theme(legend.position = "bottom")
+ggsave("clutch_size/output/clutch_sxw.jpg", width = 7, height = 5, dpi = 600)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Plot mean clutch size for each year and site
+mean_clutch <- cs_data %>%
+  group_by(year, site) %>%
+  summarise(mean_clutch = mean(maxclutch, na.rm = TRUE))
+
+#scatterplot with connected lines
+ggplot(mean_clutch, aes(x = year, y = mean_clutch, color = site, group = site)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    x = "Year",
+    y = "Mean Clutch Size"
+  ) +
+  scale_color_manual(values = c("red", "blue")) +
+  theme_bw() + 
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(axis.text.x = element_text(angle = 40, hjust = 1)) +
+  theme(axis.title.x = element_text(size = 15)) +
+  theme(axis.title.y = element_text(size = 15)) +
+  theme(legend.position = "bottom")
+ggsave("clutch_size/output/meanclutch_year.jpg", width = 7, height = 5, dpi = 600)
+#
+
+
 
 
 
@@ -368,157 +686,28 @@ summary(cs_data)
 ##############################################
 
 
-min_init <- data.frame(
-  swin_hi = 0,
-  sInit = -2.54588574,
-  site = "kig",
-  year = "2003"
-)
 
-predict(c6, newdata = min_init)
-predictInterval(c6, newdata = min_init)
-min_init_results <- exp(predictInterval(c6, newdata = min_init))
-# kig eggs at min init = 6.06 (1.5, 21.8)
+
+### 
+ggplot(cs_data, aes(x = maxclutch)) +
+  geom_histogram(binwidth = 1, color = "black", fill = "skyblue") +
+  geom_text(stat = 'bin', aes(label = ..count..), vjust = -0.5, binwidth = 1) +
+  theme_minimal()
 
 
 
-mean_init <- data.frame(
-  swin_hi = 0,
-  sInit = 0,
-  site = "kig",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = mean_init))
-# kig eggs at mean init = 4.7 (1.3, 17.8)
 
 
 
-max_init <- data.frame(
-  swin_hi = 0,
-  sInit = 4.31967593,
-  site = "kig",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = max_init))
-# kig eggs at mean init = 3.3 (0.8, 12.2)
 
 
 
-####################################
-summary(cs_data)
-
-
-min_swin_hi <- data.frame(
-  swin_hi = -2.3918018,
-  sInit = 0,
-  site = "kig",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = min_swin_hi))
-# kig eggs at min ice = 4.6 (1.3, 15.8)
-
-
-mean_swin_hi <- data.frame(
-  swin_hi = 0,
-  sInit = 0,
-  site = "kig",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = mean_swin_hi))
-# kig eggs at mean ice = 4.7 (1.4, 17.7)
-
-
-max_swin_hi <- data.frame(
-  swin_hi = 1.6013187,
-  sInit = 0,
-  site = "kig",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = max_swin_hi))
-# kig eggs at max ice = 4.8 (1.3, 16.7)
-
-
-####################################################
-
-## UTQ
-
-
-umin_init <- data.frame(
-  swin_hi = 0,
-  sInit = -2.54588574,
-  site = "utq",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = umin_init))
-# utq eggs at min init = 6.7 (1.8, 25.0)
 
 
 
-umean_init <- data.frame(
-  swin_hi = 0,
-  sInit = 0,
-  site = "utq",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = umean_init))
-# utq eggs at mean init = 5.27 (1.3, 16.8)
 
 
 
-umax_init <- data.frame(
-  swin_hi = 0,
-  sInit = 4.31967593,
-  site = "utq",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = umax_init))
-# utq eggs at mean init = 3.6 (0.9, 14.5)
-
-
-
-####################################
-summary(cs_data)
-
-
-umin_swin_hi <- data.frame(
-  swin_hi = -2.3918018,
-  sInit = 0,
-  site = "utq",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = umin_swin_hi))
-# utq eggs at min ice = 4.7 (1.4, 16.7)
-
-
-umean_swin_hi <- data.frame(
-  swin_hi = 0,
-  sInit = 0,
-  site = "utq",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = umean_swin_hi))
-# utq eggs at mean ice = 5.1 (1.4, 19.4)
-
-
-umax_swin_hi <- data.frame(
-  swin_hi = 1.6013187,
-  sInit = 0,
-  site = "utq",
-  year = "2003"
-)
-
-exp(predictInterval(c6, newdata = umax_swin_hi))
-# utq eggs at max ice = 5.9 (1.5, 20.0)
 
 
 
